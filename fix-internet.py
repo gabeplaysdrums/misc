@@ -87,5 +87,8 @@ while (True):
     else:
         print 'Failed!'
 
+    if not options.daemon:
+        break
+
     print 'going back to sleep for %d minutes ...\n' % (RESET_MINUTES,)
     time.sleep(RESET_MINUTES * 60)
