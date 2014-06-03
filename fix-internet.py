@@ -34,3 +34,19 @@ r = requests.post(
         "connectflag": "2",
     },
 )
+
+if not (r.ok and 'modemstatus_real.html' in r.text):
+    raise Exception('failed to set connection status')
+
+print 'getting connection status ...'
+r = requests.get('http://192.168.0.1/modemstatus_real.html')
+
+if not r.ok:
+    raise Exception('failed to get connection status')
+
+connected = (
+    'var iphy_conn_state = "1";' in r.text and 
+    'var iisp_conn_state = "1";' in r.text
+)
+
+print 'connected: %s' % (connected,)
