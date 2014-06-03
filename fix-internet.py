@@ -1,5 +1,6 @@
 import requests
 from optparse import OptionParser
+import time
 
 def parse_command_line():
 
@@ -24,29 +25,51 @@ r = requests.post(
 if not r.ok:
     raise Exception('failed to log in')
 
-print 'setting connection status ...'
-r = requests.post(
-    'http://192.168.0.1/goform/act_ifx_set_system_status',
-    data = {
-        "page": "modemstatus_real.html",
-        "var:conname": "",
-        "var:contype": "",
-        "connectflag": "2",
-    },
-)
+tries = 5
+connected = False
+RETRY_SECONDS = 5
 
-if not (r.ok and 'modemstatus_real.html' in r.text):
-    raise Exception('failed to set connection status')
+while not connected and tries > 0:
 
-print 'getting connection status ...'
-r = requests.get('http://192.168.0.1/modemstatus_real.html')
+    print 'setting connection status ...'
+    r = requests.post(
+        'http://192.168.0.1/goform/act_ifx_set_system_status',
+        data = {
+            "page": "modemstatus_real.html",
+            "var:conname": "",
+            "var:contype": "",
+            "connectflag": "2",
+        },
+    )
+    
+    if not (r.ok and 'modemstatus_real.html' in r.text):
+        raise Exception('failed to set connection status')
+    
+    print 'getting connection status ...'
+    r = requests.get('http://192.168.0.1/modemstatus_real.html')
+    
+    if not r.ok:
+        raise Exception('failed to get connection status')
+    
+    connected = (
+        'var iphy_conn_state = "1";' in r.text and 
+        'var iisp_conn_state = "1";' in r.text
+    )
 
-if not r.ok:
-    raise Exception('failed to get connection status')
+    tries -= 1
+    
+    print 'connected: %s' % (connected,)
 
-connected = (
-    'var iphy_conn_state = "1";' in r.text and 
-    'var iisp_conn_state = "1";' in r.text
-)
+    if connected:
+        break
 
-print 'connected: %s' % (connected,)
+    if tries == 0:
+        break
+
+    print 'Retrying in %d seconds (%d remaining) ...' % (RETRY_SECONDS, tries)
+    time.sleep(RETRY_SECONDS)
+
+if connected:
+    print 'Success!'
+else:
+    print 'Failed!'
