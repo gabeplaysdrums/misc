@@ -17,12 +17,19 @@ def parse_command_line():
         action='store_true',
     )
     
+    parser.add_option(
+        '-t', '--interval', dest='reset_minutes', default=15,
+        help='time between attempts in minutes',
+    )
+    
     return parser.parse_args()
 
 (options, args) = parse_command_line()
 
 if options.daemon:
     print 'running in daemon mode\n'
+
+reset_minutes = int(options.reset_minutes)
 
 while (True):
 
@@ -90,5 +97,5 @@ while (True):
     if not options.daemon:
         break
 
-    print 'going back to sleep for %d minutes ...\n' % (RESET_MINUTES,)
-    time.sleep(RESET_MINUTES * 60)
+    print 'going back to sleep for %d minutes ...\n' % (reset_minutes,)
+    time.sleep(reset_minutes * 60)
