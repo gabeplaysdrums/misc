@@ -100,7 +100,7 @@ while (True):
             print 'Failed!'
 
     except Exception as ex:
-        print 'Warning: encountered an exception: ' + ex
+        print 'Warning: encountered an exception: ' + str(ex)
 
     if not options.daemon:
         break
