@@ -3,6 +3,7 @@ import flickrapi
 import fnmatch
 import os
 import sys
+import hashlib
 
 API_KEY = 'f5b40cdc2dfac381aefcfd48687ddaba'
 API_SECRET = '30bce1a79b59ea4a'
@@ -80,16 +81,19 @@ for tag in options.tags:
     else:
         tags.append(tag)
 tags = ','.join(tags)
-print 'Tags: %s' % (tags,) 
+print 'Tags: %s' % (tags,)
 
 print 'Getting previously uploaded photos ...'
 uploaded = []
-for photo in flickr.walk(user_id='me', tag_mode='all', tags=tags):
+for photo in flickr.walk(user_id='me', tag_mode='all', tags=PYFLICKR_TAG):
     uploaded.append(photo.get('title'))
 
 def upload_photo(path):
     print 'Uploading %s' % (path,)
-    title = os.path.splitext(os.path.basename(path))[0]
+    title = '%s__%s' % (
+        os.path.basename(path),
+        hashlib.md5(open(path, 'rb').read()).hexdigest()
+    )
     if title in uploaded:
         print '  Skipping ... photo appears to have been uploaded already.'
         return
@@ -99,6 +103,7 @@ def upload_photo(path):
         print '  Progress: %s% ... ' % (progress,)
     flickr.upload(
         filename=path,
+        title=title,
         callback=upload_callback,
         tags=tags,
         is_public=(1 if options.is_public else 0),
