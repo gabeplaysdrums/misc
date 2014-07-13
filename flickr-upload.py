@@ -88,8 +88,14 @@ uploaded = []
 for photo in flickr.walk(user_id='me', tag_mode='all', tags=PYFLICKR_TAG):
     uploaded.append(photo.get('title'))
 
+count = 0
+total = 0
 def upload_photo(path):
-    print 'Uploading %s' % (path,)
+    global count
+    global total
+    count += 1
+    print '#%d/%d Uploading %s' % (count, total, path)
+    sys.stdout.flush()
     title = '%s__%s' % (
         os.path.basename(path),
         hashlib.md5(open(path, 'rb').read()).hexdigest()
@@ -117,8 +123,15 @@ if options.is_directory:
     patterns = PHOTO_PATTERNS + MOVIE_PATTERNS
     for root, dirs, files in os.walk(input_path):
         for pat in patterns:
+            total += len(fnmatch.filter(files, pat))
+    print 'Will now upload %d photos fo flickr.' % (total,)
+    if not raw_input('Continue? (y/n): ').lower() == 'y':
+        sys.exit(2)
+    for root, dirs, files in os.walk(input_path):
+        for pat in patterns:
             for filename in fnmatch.filter(files, pat):
                 path = os.path.join(root, filename)
                 upload_photo(path)
 else:
+    total = 1
     upload_photo(input_path)
