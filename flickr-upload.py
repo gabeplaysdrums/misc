@@ -69,6 +69,12 @@ def parse_command_line():
         action='store_true',
     )
 
+    parser.add_option(
+        '--unattend', dest='is_unattend', default=False,
+        help='run without prompting',
+        action='store_true',
+    )
+
     return parser.parse_args()
 
 (options, args) = parse_command_line()
@@ -117,10 +123,10 @@ def upload_photo(path):
     if os.path.exists(uploaded_path):
         print '  Skipping ... photo appears to have been uploaded already.'
         return
-    title = '%s__%s' % (
-        os.path.basename(path),
-        hashlib.md5(open(path, 'rb').read()).hexdigest()
-    )
+    hash = None
+    with open(path, 'rb') as f:
+        hash = hashlib.md5(f.read()).hexdigest()
+    title = '%s__%s' % (os.path.basename(path), hash)
     if title in uploaded:
         print '  Skipping ... photo appears to have been uploaded already.'
     	open(uploaded_path, 'w').close()
@@ -167,12 +173,13 @@ if options.is_directory:
                     continue
                 paths.append(path)
     total = len(paths)
-    choice = None
-    while not choice or not (choice == 'y' or choice == 'n'):
-        print 'Will now upload %d photos to flickr.' % (total,)
-        choice = raw_input('Continue? (y/n): ').lower()
-    if not choice == 'y':
-        sys.exit(2)
+    if not options.is_unattend:
+        choice = None
+        while not choice or not (choice == 'y' or choice == 'n'):
+            print 'Will now upload %d photos to flickr.' % (total,)
+            choice = raw_input('Continue? (y/n): ').lower()
+        if not choice == 'y':
+            sys.exit(2)
     pool = threadpool.ThreadPool(THREADPOOL_SIZE)
     def exc_callback(req, exception_details):
         print 'Exception occurred.  Putting the request back in the worker queue.'
