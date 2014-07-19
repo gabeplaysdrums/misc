@@ -5,6 +5,7 @@ import os
 import sys
 import hashlib
 from csv import DictReader, DictWriter
+from datetime import datetime
 
 API_KEY = 'f5b40cdc2dfac381aefcfd48687ddaba'
 API_SECRET = '30bce1a79b59ea4a'
@@ -56,12 +57,19 @@ if __name__ == "__main__":
             writer.writeheader()
 
         count = 0
+        start = None
 
         for photo in flickr.walk(
-            user_id='me', tag_mode='all', tags=PYFLICKR_TAG
+            user_id='me',
+            tag_mode='all',
+            tags=PYFLICKR_TAG,
+            per_page=500,
         ):
             if photo.get('id') in dumped:
                 continue
+
+            if not start:
+                start = datetime.now()
 
             info = flickr.photos_getInfo(photo_id=photo.get('id'))
             photo_info = info.find('photo')
@@ -79,6 +87,10 @@ if __name__ == "__main__":
             count += 1
 
             if count % 100 == 0:
-                print 'dumped %d photos' % (count,)
+                elapsed = (datetime.now() - start).total_seconds()
+                print 'dumped %d photos (%.2f/s)' % (
+                    count,
+                    float(count) / elapsed,
+                )
 
     print 'Done!'

@@ -103,7 +103,12 @@ if __name__ == "__main__":
 
     print 'Getting previously uploaded photos ...'
     uploaded = set()
-    for photo in flickr.walk(user_id='me', tag_mode='all', tags=PYFLICKR_TAG):
+    for photo in flickr.walk(
+        user_id='me',
+        tag_mode='all',
+        tags=PYFLICKR_TAG,
+        per_page=500,
+    ):
         uploaded.add(photo.get('title'))
 
     count = 0
