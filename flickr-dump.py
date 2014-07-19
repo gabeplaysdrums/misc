@@ -1,9 +1,6 @@
 from optparse import OptionParser
 import flickrapi
-import fnmatch
 import os
-import sys
-import hashlib
 from csv import DictReader, DictWriter
 from datetime import datetime
 
