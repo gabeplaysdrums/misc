@@ -4,7 +4,7 @@ import fnmatch
 import os
 import sys
 import hashlib
-from csv import DictWriter
+from csv import DictReader, DictWriter
 
 API_KEY = 'f5b40cdc2dfac381aefcfd48687ddaba'
 API_SECRET = '30bce1a79b59ea4a'
@@ -32,7 +32,15 @@ if __name__ == "__main__":
     flickr.authenticate_console(perms='read')
 
     print 'Getting previously uploaded photos ...'
-    with open(options.output_path, 'wb') as csvfile:
+    append = os.path.isfile(options.output_path)
+
+    dumped = set()
+    if append:
+        with open(options.output_path, 'rb') as csvfile:
+            reader = DictReader(csvfile)
+            dumped.update([ row['id'] for row in reader ])
+
+    with open(options.output_path, 'ab') as csvfile:
         writer = DictWriter(csvfile, extrasaction='ignore', fieldnames=(
             'id',
             'title',
@@ -43,12 +51,18 @@ if __name__ == "__main__":
             'date_posted',
             'url',
         ))
-        writer.writeheader()
+
+        if not append:
+            writer.writeheader()
+
         count = 0
 
         for photo in flickr.walk(
             user_id='me', tag_mode='all', tags=PYFLICKR_TAG
         ):
+            if photo.get('id') in dumped:
+                continue
+
             info = flickr.photos_getInfo(photo_id=photo.get('id'))
             photo_info = info.find('photo')
             data = {
