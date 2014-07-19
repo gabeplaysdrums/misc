@@ -1,15 +1,19 @@
 from optparse import OptionParser
 import flickrapi
 import fnmatch
+import hashlib
 import os
 import sys
-import hashlib
+import threadpool
+from datetime import datetime, timedelta
 
 API_KEY = 'f5b40cdc2dfac381aefcfd48687ddaba'
 API_SECRET = '30bce1a79b59ea4a'
 PHOTO_PATTERNS = ('*.jpg', '*.jpeg', '*.png', '*.bmp')
 MOVIE_PATTERNS = ('*.mov', '*.mp4', '*.mpg', '*.mpeg', '*.avi')
 PYFLICKR_TAG = 'PyFlickr'
+THREADPOOL_SIZE = 15
+UPLOADED_FILE_SUFFIX = '.uploaded'
 
 def parse_command_line():
 
@@ -59,6 +63,18 @@ def parse_command_line():
         action='append',
     )
 
+    parser.add_option(
+        '--skip-uploaded-check', dest='skip_uploaded_check', default=False,
+        help='don\'t query the service to determine which photos have already been uploaded',
+        action='store_true',
+    )
+
+    parser.add_option(
+        '--unattend', dest='is_unattend', default=False,
+        help='run without prompting',
+        action='store_true',
+    )
+
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -86,18 +102,36 @@ if __name__ == "__main__":
     print 'Tags: %s' % (tags,)
 
     print 'Getting previously uploaded photos ...'
-    uploaded = []
+    uploaded = set()
     for photo in flickr.walk(user_id='me', tag_mode='all', tags=PYFLICKR_TAG):
-        uploaded.append(photo.get('title'))
+        uploaded.add(photo.get('title'))
+
+    count = 0
+    total = 0
+    completed = 0
+    checkpoint_completed = 0
+    checkpoint_time = None
 
     def upload_photo(path):
-        print 'Uploading %s' % (path,)
-        title = '%s__%s' % (
-            os.path.basename(path),
-            hashlib.md5(open(path, 'rb').read()).hexdigest()
-        )
+        global count
+        global total
+        global completed
+        global checkpoint_completed
+        global checkpoint_time
+        count += 1
+        print '#%d/%d Uploading %s' % (count, total, path)
+        sys.stdout.flush()
+        uploaded_path = path + UPLOADED_FILE_SUFFIX
+        if os.path.exists(uploaded_path):
+            print '  Skipping ... photo appears to have been uploaded already.'
+            return
+        hash = None
+        with open(path, 'rb') as f:
+            hash = hashlib.md5(f.read()).hexdigest()
+        title = '%s__%s' % (os.path.basename(path), hash)
         if title in uploaded:
             print '  Skipping ... photo appears to have been uploaded already.'
+        	open(uploaded_path, 'w').close()
             return
         if options.is_dry_run:
             return
@@ -114,13 +148,50 @@ if __name__ == "__main__":
             hidden=(2 if options.is_public_search else 1),
         )
         print '  Done!'
+        completed += 1
+        open(uploaded_path, 'w').close()
+        # print photos per minute every 60 seconds
+        now = datetime.now()
+        delta = now - checkpoint_time
+        if delta > timedelta(seconds=60):
+            uploads_per_minute = 60 * float(completed - checkpoint_completed) / delta.total_seconds()
+            minutes_remaining = (total - count) / uploads_per_minute if uploads_per_minute != 0 else 0
+            print '=== Current rate: %.2f uploads/minute (%.2f minutes remaining) ===' % (
+                uploads_per_minute, minutes_remaining
+            )
+            sys.stdout.flush()
+            checkpoint_time = now
+            checkpoint_completed = completed
 
     if options.is_directory:
         patterns = PHOTO_PATTERNS + MOVIE_PATTERNS
+        paths = []
         for root, dirs, files in os.walk(input_path):
             for pat in patterns:
                 for filename in fnmatch.filter(files, pat):
                     path = os.path.join(root, filename)
-                    upload_photo(path)
+                    uploaded_path = path + UPLOADED_FILE_SUFFIX
+                    if os.path.exists(uploaded_path):
+                        continue
+                    paths.append(path)
+        total = len(paths)
+        if not options.is_unattend:
+            choice = None
+            while not choice or not (choice == 'y' or choice == 'n'):
+                print 'Will now upload %d photos to flickr.' % (total,)
+                choice = raw_input('Continue? (y/n): ').lower()
+            if not choice == 'y':
+                sys.exit(2)
+        pool = threadpool.ThreadPool(THREADPOOL_SIZE)
+        def exc_callback(req, exception_details):
+            print 'Exception occurred.  Putting the request back in the worker queue.'
+            req2 = threadpool.WorkRequest(upload_photo, args=req.args, exc_callback=req.exc_callback)
+            pool.putRequest(req2)
+        requests = threadpool.makeRequests(upload_photo, paths, exc_callback=exc_callback)
+        checkpoint_time = datetime.now()
+        for req in requests:
+            pool.putRequest(req)
+        pool.wait()
     else:
+        total = 1
         upload_photo(input_path)
