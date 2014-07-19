@@ -61,64 +61,66 @@ def parse_command_line():
 
     return parser.parse_args()
 
-(options, args) = parse_command_line()
+if __name__ == "__main__":
 
-if len(args) < 1:
-    print 'Please specify input path'
-    sys.exit(1)
+    (options, args) = parse_command_line()
 
-input_path = args[0]
+    if len(args) < 1:
+        print 'Please specify input path'
+        sys.exit(1)
 
-print 'Authenticating ...'
-flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
-flickr.authenticate_console(perms='write')
+    input_path = args[0]
 
-# compute tags
-tags = [PYFLICKR_TAG]
-for tag in options.tags:
-    if ' ' in tag:
-        tags.append('"%s"' % (tag,))
+    print 'Authenticating ...'
+    flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
+    flickr.authenticate_console(perms='write')
+
+    # compute tags
+    tags = [PYFLICKR_TAG]
+    for tag in options.tags:
+        if ' ' in tag:
+            tags.append('"%s"' % (tag,))
+        else:
+            tags.append(tag)
+    tags = ','.join(tags)
+    print 'Tags: %s' % (tags,)
+
+    print 'Getting previously uploaded photos ...'
+    uploaded = []
+    for photo in flickr.walk(user_id='me', tag_mode='all', tags=PYFLICKR_TAG):
+        uploaded.append(photo.get('title'))
+
+    def upload_photo(path):
+        print 'Uploading %s' % (path,)
+        title = '%s__%s' % (
+            os.path.basename(path),
+            hashlib.md5(open(path, 'rb').read()).hexdigest()
+        )
+        if title in uploaded:
+            print '  Skipping ... photo appears to have been uploaded already.'
+            return
+        if options.is_dry_run:
+            return
+        def upload_callback(progress, done):
+            print '  Progress: %s% ... ' % (progress,)
+        flickr.upload(
+            filename=path,
+            title=title,
+            callback=upload_callback,
+            tags=tags,
+            is_public=(1 if options.is_public else 0),
+            is_friend=(1 if options.is_friend else 0),
+            is_family=(1 if options.is_family else 0),
+            hidden=(2 if options.is_public_search else 1),
+        )
+        print '  Done!'
+
+    if options.is_directory:
+        patterns = PHOTO_PATTERNS + MOVIE_PATTERNS
+        for root, dirs, files in os.walk(input_path):
+            for pat in patterns:
+                for filename in fnmatch.filter(files, pat):
+                    path = os.path.join(root, filename)
+                    upload_photo(path)
     else:
-        tags.append(tag)
-tags = ','.join(tags)
-print 'Tags: %s' % (tags,)
-
-print 'Getting previously uploaded photos ...'
-uploaded = []
-for photo in flickr.walk(user_id='me', tag_mode='all', tags=PYFLICKR_TAG):
-    uploaded.append(photo.get('title'))
-
-def upload_photo(path):
-    print 'Uploading %s' % (path,)
-    title = '%s__%s' % (
-        os.path.basename(path),
-        hashlib.md5(open(path, 'rb').read()).hexdigest()
-    )
-    if title in uploaded:
-        print '  Skipping ... photo appears to have been uploaded already.'
-        return
-    if options.is_dry_run:
-        return
-    def upload_callback(progress, done):
-        print '  Progress: %s% ... ' % (progress,)
-    flickr.upload(
-        filename=path,
-        title=title,
-        callback=upload_callback,
-        tags=tags,
-        is_public=(1 if options.is_public else 0),
-        is_friend=(1 if options.is_friend else 0),
-        is_family=(1 if options.is_family else 0),
-        hidden=(2 if options.is_public_search else 1),
-    )
-    print '  Done!'
-
-if options.is_directory:
-    patterns = PHOTO_PATTERNS + MOVIE_PATTERNS
-    for root, dirs, files in os.walk(input_path):
-        for pat in patterns:
-            for filename in fnmatch.filter(files, pat):
-                path = os.path.join(root, filename)
-                upload_photo(path)
-else:
-    upload_photo(input_path)
+        upload_photo(input_path)

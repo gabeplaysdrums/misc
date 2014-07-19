@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf8'?>
+<rsp stat="ok">
+<photo dateuploaded="1405356707" farm="6" id="14673917283" isfavorite="0" license="0" media="photo" originalformat="jpg" originalsecret="7be9a006f2" rotation="0" safety_level="0" secret="225610cd2f" server="5493" views="0">
+	<owner iconfarm="8" iconserver="7315" location="" nsid="97803768@N04" path_alias="" realname="Gabriel Young" username="gabeplaysdrums" />
+	<title>IMG_8642.JPG__e0f5bff242907808f55234a6d880a51d</title>
+	<description />
+	<visibility isfamily="0" isfriend="0" ispublic="0" />
+	<dates lastupdate="1405356714" posted="1405356707" taken="2013-08-24 20:04:16" takengranularity="0" />
+	<permissions permaddmeta="2" permcomment="1" />
+	<editability canaddmeta="1" cancomment="1" />
+	<publiceditability canaddmeta="0" cancomment="0" />
+	<usage canblog="1" candownload="1" canprint="1" canshare="1" />
+	<comments>0</comments>
+	<notes />
+	<people haspeople="0" />
+	<tags>
+		<tag author="97803768@N04" authorname="gabeplaysdrums" id="97771629-14673917283-79415285" machine_tag="0" raw="PyFlickr">pyflickr</tag>
+		<tag author="97803768@N04" authorname="gabeplaysdrums" id="97771629-14673917283-224395511" machine_tag="0" raw="arijas-camera">arijascamera</tag>
+	</tags>
+	<urls>
+		<url type="photopage">https://www.flickr.com/photos/97803768@N04/14673917283/</url>
+	</urls>
+</photo>
+</rsp>
