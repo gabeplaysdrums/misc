@@ -39,7 +39,7 @@ if __name__ == "__main__":
     if append:
         with open(options.output_path, 'rb') as csvfile:
             reader = DictReader(csvfile)
-            dumped.update([ row['id'] for row in reader ])
+            dumped.update([ int(row['id']) for row in reader ])
 
     with open(options.output_path, 'ab') as csvfile:
         writer = DictWriter(csvfile, extrasaction='ignore', fieldnames=(
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             tags=PYFLICKR_TAG,
             per_page=500,
         ):
-            if photo.get('id') in dumped:
+            if int(photo.get('id')) in dumped:
                 continue
 
             if not start:
