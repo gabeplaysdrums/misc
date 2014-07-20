@@ -12,7 +12,6 @@ API_SECRET = '30bce1a79b59ea4a'
 PHOTO_PATTERNS = ('*.jpg', '*.jpeg', '*.png', '*.bmp')
 MOVIE_PATTERNS = ('*.mov', '*.mp4', '*.mpg', '*.mpeg', '*.avi')
 PYFLICKR_TAG = 'PyFlickr'
-THREADPOOL_SIZE = 15
 UPLOADED_FILE_SUFFIX = '.uploaded'
 
 def parse_command_line():
@@ -78,6 +77,23 @@ def parse_command_line():
     parser.add_option(
         '-o', '--output-root', dest='output_root', default=None,
         help='override root of output files',
+    )
+
+    parser.add_option(
+        '--no-movies', dest='upload_movies', default=True,
+        help='do not upload movie files',
+        action='store_false',
+    )
+
+    parser.add_option(
+        '--no-pictures', dest='upload_pictures', default=True,
+        help='do not upload picture files',
+        action='store_false',
+    )
+
+    parser.add_option(
+        '--threadpool-size', dest='threadpool_size', default=15,
+        help='size of the threadpool',
     )
 
     return parser.parse_args()
@@ -195,8 +211,16 @@ if __name__ == "__main__":
         options.output_root = input_root
 
     if options.is_directory:
-        patterns = PHOTO_PATTERNS + MOVIE_PATTERNS
+
+        # build patterns list
+        patterns = ()
+        if options.upload_pictures:
+            patterns += PHOTO_PATTERNS
+        if options.upload_movies:
+            patterns += MOVIE_PATTERNS
         patterns += tuple(x.upper() for x in patterns)
+
+        # build path list
         paths = []
         for root, dirs, files in os.walk(input_root):
             for pat in patterns:
@@ -206,6 +230,8 @@ if __name__ == "__main__":
                         continue
                     paths.append(path)
         total = len(paths)
+
+        # confirm
         if not options.is_unattend:
             choice = None
             while not choice or not (choice == 'y' or choice == 'n'):
@@ -213,7 +239,10 @@ if __name__ == "__main__":
                 choice = raw_input('Continue? (y/n): ').lower()
             if not choice == 'y':
                 sys.exit(2)
-        pool = threadpool.ThreadPool(THREADPOOL_SIZE)
+
+        # start thread pool
+        pool_size = int(options.threadpool_size)
+        pool = threadpool.ThreadPool(pool_size)
         def exc_callback(req, exception_details):
             print exception_details
             print 'Exception occurred.  Putting the request back in the worker queue.'
@@ -224,6 +253,7 @@ if __name__ == "__main__":
         for req in requests:
             pool.putRequest(req)
         pool.wait()
+
     else:
         total = 1
         upload_photo(input_path)
