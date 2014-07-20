@@ -1,2 +1,5 @@
 *.swp
 *.pyc
+*.csv
+*.xlsx
+pyflickr-out/

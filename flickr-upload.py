@@ -75,6 +75,11 @@ def parse_command_line():
         action='store_true',
     )
 
+    parser.add_option(
+        '-o', '--output-root', dest='output_root', default=None,
+        help='override root of output files',
+    )
+
     return parser.parse_args()
 
 if __name__ == "__main__":
@@ -86,6 +91,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     input_path = args[0]
+    input_root = None
 
     print 'Authenticating ...'
     flickr = flickrapi.FlickrAPI(API_KEY, API_SECRET)
@@ -117,6 +123,18 @@ if __name__ == "__main__":
     checkpoint_completed = 0
     checkpoint_time = None
 
+    def find_uploaded_marker_path(path):
+        if os.path.exists(path + UPLOADED_FILE_SUFFIX):
+            return path + UPLOADED_FILE_SUFFIX
+        path_suffix = path.split(input_root)[1]
+        return os.path.join(options.output_root, path_suffix + UPLOADED_FILE_SUFFIX)
+
+    def touch_file(path):
+        d = os.path.dirname(path)
+        if not os.path.exists(d):
+            os.makedirs(d)
+        open(path, 'w').close()
+
     def upload_photo(path):
         global count
         global total
@@ -126,7 +144,7 @@ if __name__ == "__main__":
         count += 1
         print '#%d/%d Uploading %s' % (count, total, path)
         sys.stdout.flush()
-        uploaded_path = path + UPLOADED_FILE_SUFFIX
+        uploaded_path = find_uploaded_marker_path(path)
         if os.path.exists(uploaded_path):
             print '  Skipping ... photo appears to have been uploaded already.'
             return
@@ -136,7 +154,7 @@ if __name__ == "__main__":
         title = '%s__%s' % (os.path.basename(path), hash)
         if title in uploaded:
             print '  Skipping ... photo appears to have been uploaded already.'
-        	open(uploaded_path, 'w').close()
+            touch_file(uploaded_path)
             return
         if options.is_dry_run:
             return
@@ -154,7 +172,7 @@ if __name__ == "__main__":
         )
         print '  Done!'
         completed += 1
-        open(uploaded_path, 'w').close()
+        touch_file(uploaded_path)
         # print photos per minute every 60 seconds
         now = datetime.now()
         delta = now - checkpoint_time
@@ -169,14 +187,22 @@ if __name__ == "__main__":
             checkpoint_completed = completed
 
     if options.is_directory:
+        input_root = input_path
+    else:
+        input_root = os.path.dirname(input_path)
+
+    if not options.output_root:
+        options.output_root = input_root
+
+    if options.is_directory:
         patterns = PHOTO_PATTERNS + MOVIE_PATTERNS
+        patterns += tuple(x.upper() for x in patterns)
         paths = []
-        for root, dirs, files in os.walk(input_path):
+        for root, dirs, files in os.walk(input_root):
             for pat in patterns:
                 for filename in fnmatch.filter(files, pat):
                     path = os.path.join(root, filename)
-                    uploaded_path = path + UPLOADED_FILE_SUFFIX
-                    if os.path.exists(uploaded_path):
+                    if os.path.exists(find_uploaded_marker_path(path)):
                         continue
                     paths.append(path)
         total = len(paths)
@@ -189,6 +215,7 @@ if __name__ == "__main__":
                 sys.exit(2)
         pool = threadpool.ThreadPool(THREADPOOL_SIZE)
         def exc_callback(req, exception_details):
+            print exception_details
             print 'Exception occurred.  Putting the request back in the worker queue.'
             req2 = threadpool.WorkRequest(upload_photo, args=req.args, exc_callback=req.exc_callback)
             pool.putRequest(req2)
