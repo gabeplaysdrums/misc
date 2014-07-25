@@ -1,14 +1,19 @@
+"""
+Produce a histogram of photos by date from a CSV of photo data
+"""
+
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from optparse import OptionParser
+from pyflickr_utils import *
+import os
 import re
 import sys
-import os
 
 def parse_command_line():
 
     parser = OptionParser(
-        usage = '%prog [options] dump.csv'
+        usage = '%prog [options] uploaded.csv'
     )
 
     parser.add_option(
@@ -26,15 +31,17 @@ def parse_command_line():
         help='number of photos per day considered significant when clustering',
     )
 
-    return parser.parse_args()
+    (options, args) = parser.parse_args()
+
+    if len(args) < 1:
+        parser.print_usage()
+        sys.exit(1)
+
+    return (options, args)
 
 if __name__ == "__main__":
 
     (options, args) = parse_command_line()
-
-    if len(args) < 1:
-        print 'not enough arguments'
-        sys.exit(1)
 
     input_path = args[0]
     hist = dict()

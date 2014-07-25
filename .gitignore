@@ -2,5 +2,6 @@
 *.pyc
 *.csv
 *.xlsx
+*.log
 pyflickr-in/
 pyflickr-out/
