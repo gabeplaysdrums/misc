@@ -35,7 +35,6 @@ def make_csv_writer(csvfile):
         'upload_start',
         'upload_end',
         'date_taken',
-        'description',
         'shorturl',
         'url',
         'media',
