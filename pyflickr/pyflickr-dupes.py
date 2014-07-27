@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Remove duplicate photos on Flickr
 """

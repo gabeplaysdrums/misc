@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """
 Recursively searches a directory and uploads photos to Flickr
 """
