@@ -240,8 +240,11 @@ if __name__ == '__main__':
         if not append:
             writer.writeheader()
 
+        # start the write csv threadpool
+        write_csv_pool = threadpool.ThreadPool(1)
+
         # start the post-upload threadpool
-        post_upload_pool = threadpool.ThreadPool(1)
+        post_upload_pool = threadpool.ThreadPool(options.threadpool_size)
 
         with open('pyflickr-upload.log', 'w') as logfile:
 
@@ -254,6 +257,9 @@ if __name__ == '__main__':
             upload_total = len(paths)
             start_time = datetime.now()
             checkpoint_time = start_time
+
+            def write_csv(row):
+                writer.writerow(row)
 
             def post_upload(
                 count,
@@ -319,7 +325,10 @@ if __name__ == '__main__':
                 shorturl = flickrapi.shorturl.url(photo_id)
                 row = locals()
                 row.update(filemeta)
-                writer.writerow(row)
+
+                # put the row in the write csv threadpool
+                req = threadpool.WorkRequest(write_csv, args=(row,))
+                write_csv_pool.putRequest(req)
 
                 # add it to the list of known titles in case there are duplicates
                 known_titles.add(title)
@@ -363,24 +372,6 @@ if __name__ == '__main__':
 
                 filemeta, title, description, date_taken = \
                     get_photo_meta(path, relpath, filehash)
-
-                """
-                date_created, date_modified, exif_date, mov_date, date_taken = \
-                    get_photo_dates(path)
-
-                filemeta = {
-                    'relpath': relpath,
-                    'abspath': os.path.abspath(path),
-                    'created': date_created.strftime(FLICKR_DATE_FORMAT),
-                    'modified': date_modified.strftime(FLICKR_DATE_FORMAT),
-                    'filehash': filehash,
-                    'filesize': os.path.getsize(path),
-                    'exif_original_date': exif_date.strftime(FLICKR_DATE_FORMAT) if exif_date else None,
-                    'mov_created_date': mov_date.strftime(FLICKR_DATE_FORMAT) if mov_date else None,
-                }
-                title = '%s__%s' % (os.path.basename(path), filehash)
-                description = photo_description(filemeta)
-                """
                 
                 photo_id = None
 
@@ -441,3 +432,4 @@ if __name__ == '__main__':
 
             upload_pool.wait()
             post_upload_pool.wait()
+            write_csv_pool.wait()
