@@ -15,6 +15,11 @@ import os
 import sys
 import threadpool
 
+# maximum sizes:
+# https://help.yahoo.com/kb/flickr/upload-limitations-flickr-sln15628.html?impressions=true
+MAX_PICTURE_FILE_SIZE = 209715200 # 200 MB
+MAX_MOVIE_FILE_SIZE = 1073700000 # 1 GB
+
 PHOTO_PATTERNS = ('*.jpg', '*.jpeg', '*.png', '*.bmp')
 MOVIE_PATTERNS = ('*.mov', '*.mp4', '*.mpg', '*.mpeg', '*.avi')
 
@@ -223,11 +228,11 @@ if __name__ == '__main__':
         print 'Found %d photos on flickr (%d unique titles)' % (len(uploaded_photos), len(excluded_titles))
 
     # confirm
+    print 'Will now upload %d photos to flickr.' % (len(paths),)
     if not options.is_unattend:
         choice = None
         print ''
         while not choice or not (choice == 'y' or choice == 'n'):
-            print 'Will now upload %d photos to flickr.' % (len(paths),)
             choice = raw_input('Continue? (y/n): ').lower()
         print ''
         if not choice == 'y':
