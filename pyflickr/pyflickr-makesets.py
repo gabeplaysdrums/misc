@@ -30,6 +30,12 @@ def parse_command_line():
         action='store_true',
     )
 
+    parser.add_option(
+        '--most-recent-monthly', dest='most_recent_monthly_count', default=0,
+        help='only update most recent N monthly photosets',
+        type='int',
+    )
+
     (options, args) = parser.parse_args()
 
     if len(args) < 1:
@@ -109,7 +115,7 @@ if __name__ == "__main__":
                         photo_ids=photo_ids_string,
                     )
                     return
-                except Error, e:
+                except Exception, e:
                     exc = e
                     time.sleep(5)
                     pass
@@ -128,6 +134,10 @@ if __name__ == "__main__":
 
     # sort monthly photosets chronologically
     photosets = sorted(monthly_photosets.values(), key=lambda x: datetime.strptime(x.title, '%B %Y'))
+
+    # slice
+    if options.most_recent_monthly_count > 0:
+        photosets = photosets[-options.most_recent_monthly_count:]
 
     print 'Will now create or modify %d photosets.' % (len(photosets),)
 

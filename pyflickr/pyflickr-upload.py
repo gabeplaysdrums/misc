@@ -265,6 +265,7 @@ if __name__ == '__main__':
 
             def write_csv(row):
                 writer.writerow(row)
+                csvfile.flush()
 
             def post_upload(
                 count,
