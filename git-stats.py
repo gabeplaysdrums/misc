@@ -13,12 +13,19 @@ def parse_command_line():
         help='file denoting author groups',
     )
 
+    parser.add_option(
+        '-x', '--exclude', dest='exclude_filters', default=[], metavar='DIR',
+        help='exclude the given path filter',
+        action='append',
+    )
+
     return parser.parse_args()
 
 (options, args) = parse_command_line()
 
 import subprocess
 import re
+import fnmatch
 
 groups = dict()
 
@@ -26,12 +33,20 @@ if options.groups_path:
     group_name = None
     for line in open(options.groups_path):
         line = line.strip()
+        if not line:
+            continue
         m = re.match(r'\[(.*)\]', line)
         if m:
             group_name = m.group(1)
             groups[group_name] = []
             continue
         groups[group_name].append(line)
+
+if options.exclude_filters:
+    print 'excluding:'
+    for f in options.exclude_filters:
+        print '    ' + f
+    print ''
 
 line_counts = dict()
 
@@ -41,6 +56,9 @@ for filename in subprocess.check_output(
 ).split('\n'):
 
     if not filename:
+        continue
+
+    if any(fnmatch.fnmatch(filename, f) for f in options.exclude_filters):
         continue
 
     print filename
@@ -70,7 +88,7 @@ def print_table(line_counts, author_label='Author'):
 
     print ''
     print '%-40s %5s %7s' % (author_label, 'Count', 'Percent')
-    print '%-40s %5s %7s'   % ('======', '=====', '=======')
+    print '%-40s %5s %7s' % ('======',     '=====', '=======')
 
     for author, count in reversed(sorted(
         line_counts.items(), key=lambda x: x[1]
