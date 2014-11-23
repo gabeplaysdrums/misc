@@ -93,7 +93,11 @@ def print_table(line_counts, author_label='Author'):
     for author, count in reversed(sorted(
         line_counts.items(), key=lambda x: x[1]
     )):
-        print '%-40s %5d %6.2f%%' % (author, count, 100.0 * count / total_lines)
+        print '%-40s %5d %6.2f%%' % (
+            author[:40], 
+            count, 
+            100.0 * count / total_lines
+        )
 
 
 print_table(line_counts)
