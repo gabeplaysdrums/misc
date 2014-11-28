@@ -1,5 +1,9 @@
 #!/bin/python
 
+"""
+Compile statistics about a git repository
+"""
+
 from optparse import OptionParser
 
 def parse_command_line():

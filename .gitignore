@@ -5,3 +5,4 @@
 *.log
 pyflickr-in/
 pyflickr-out/
+.idea/
