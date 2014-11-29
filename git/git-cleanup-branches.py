@@ -10,7 +10,7 @@ from optparse import OptionParser
 def parse_command_line():
 
     parser = OptionParser(
-        usage = '%prog [options]'
+        usage='%prog [options]'
     )
 
     parser.add_option(
@@ -31,10 +31,7 @@ import sys
 import re
 from datetime import datetime
 import fnmatch
-
-
-def cmd_lines(*args):
-    return subprocess.check_output(args, stderr=subprocess.STDOUT).split('\n')
+from git_helpers import cmd_lines, get_editor_command
 
 
 class Branch:
@@ -132,19 +129,7 @@ f.close()
 
 # find editor command
 
-editor_command = None
-
-try:
-    for line in cmd_lines('git', 'config', 'core.editor'):
-        line = line.strip()
-        if line:
-            editor_command = line
-            break
-except subprocess.CalledProcessError:
-    pass
-
-if not editor_command:
-    editor_command = 'vi'
+editor_command = get_editor_command()
 
 # show the list
 

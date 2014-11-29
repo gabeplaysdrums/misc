@@ -6,10 +6,11 @@ Compile statistics about a git repository
 
 from optparse import OptionParser
 
+
 def parse_command_line():
 
     parser = OptionParser(
-        usage = '%prog [options]'
+        usage='%prog [options]'
     )
 
     parser.add_option(
@@ -25,39 +26,20 @@ def parse_command_line():
 
     return parser.parse_args()
 
+
 (options, args) = parse_command_line()
+
 
 import subprocess
 import re
 import fnmatch
+from git_helpers import cmd_lines, load_author_groups
 
-groups = dict()
 
-if options.groups_path:
-    group_name = None
-    for line in open(options.groups_path):
-        line = line.strip()
-        if not line:
-            continue
-        m = re.match(r'\[(.*)\]', line)
-        if m:
-            group_name = m.group(1)
-            groups[group_name] = []
-            continue
-        groups[group_name].append(line)
-
-if options.exclude_filters:
-    print 'excluding:'
-    for f in options.exclude_filters:
-        print '    ' + f
-    print ''
-
+groups = load_author_groups(options.groups_path) if options.groups_path else dict()
 line_counts = dict()
 
-for filename in subprocess.check_output(
-    ['git', 'ls-tree', '-r', '--name-only', 'HEAD'],
-    stderr=subprocess.STDOUT
-).split('\n'):
+for filename in cmd_lines('git', 'ls-tree', '-r', '--name-only', 'HEAD'):
 
     if not filename:
         continue
@@ -67,23 +49,25 @@ for filename in subprocess.check_output(
 
     print filename
 
-    for line in subprocess.check_output(
-        ['git', 'blame', '-e', 'HEAD', filename], stderr=subprocess.STDOUT
-    ).split('\n'):
+    try:
+        for line in cmd_lines('git', 'blame', '-e', 'HEAD', filename):
 
-        if not line:
-            continue
+            if not line:
+                continue
 
-        m = re.search(r'[0-9a-f]{7}\s+.*\(\<(.+)\>\s+\d{4}-\d{2}-\d{2}', line)
+            m = re.search(r'[0-9a-f]{7}\s+.*\(\<(.+)\>\s+\d{4}-\d{2}-\d{2}', line)
 
-        if (m):
-            author = m.group(1)
-            if not author in line_counts:
-                line_counts[author] = 0
-            line_counts[author] += 1
-        else:
-            print 'warning: could not parse line:'
-            print '    "' + line[:60] + '..."'
+            if (m):
+                author = m.group(1)
+                if not author in line_counts:
+                    line_counts[author] = 0
+                line_counts[author] += 1
+            else:
+                print 'warning: could not parse line:'
+                print '    "' + line[:60] + '..."'
+    except subprocess.CalledProcessError:
+        print 'warning: could not get author information for file:', filename
+        pass
 
 
 def print_table(line_counts, author_label='Author'):
