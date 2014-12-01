@@ -19,6 +19,12 @@ def parse_command_line():
         action='append',
     )
 
+    parser.add_option(
+        '-v', '--verbose', dest='verbose', default=False,
+        help='print verbose output',
+        action='store_true',
+    )
+
     return parser.parse_args()
 
 (options, args) = parse_command_line()
@@ -55,7 +61,16 @@ class Branch:
                     # Thu Nov 27 19:17:23 2014
                     self.__updated = datetime.strptime(m.group(1), DATE_FORMAT)
                     break
+            printv('branch last updated: branch=', self, ', date=', self.__updated)
         return self.__updated
+
+    def __str__(self):
+        return 'remote=%s, name=%s' % (self.remote, self.name)
+
+
+def printv(*args):
+    if options.verbose:
+        print ' '.join(str(x) for x in args)
 
 
 REMOTE_PREFIX = 'remotes/'
@@ -88,12 +103,16 @@ for line in cmd_lines('git', 'branch', '--all'):
     if line[0] == '*':
         continue
 
+    if not re.match(r'[a-zA-Z0-9-]+(\/[a-zA-Z0-9-]+)*$', line):
+        continue
+
     branch = parse_branch(line)
 
     if any(fnmatch.fnmatch(branch.name, pattern) for pattern in options.exclude_filters):
         continue
 
     branches.append(branch)
+    printv('found branch:', branch)
 
 filename = os.path.join(tempfile.gettempdir(), 'GIT_CLEANUP_BRANCHES_LIST')
 f = open(filename, 'w')
@@ -121,8 +140,17 @@ f.writelines([
     '# ===============\n',
 ])
 
-for branch in sorted(filter(lambda x: x.remote is not None, branches), key=lambda x: x.last_updated_date):
-    f.write('# %-30s # %s\n' % (branch.fqn, branch.last_updated_date.strftime(DATE_FORMAT)))
+def compare_dates(x, y):
+    if x is None and y is None:
+        return 0
+    if x is None:
+        return -1
+    if y is None:
+        return 1
+    return int((x - y).total_seconds())
+
+for branch in sorted(filter(lambda x: x.remote is not None, branches), key=lambda x: x.last_updated_date, cmp=compare_dates):
+    f.write('# %-30s # %s\n' % (branch.fqn, branch.last_updated_date.strftime(DATE_FORMAT) if branch.last_updated_date is not None else '(unknown)'))
 
 f.write('\n')
 f.close()
