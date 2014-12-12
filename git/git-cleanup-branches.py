@@ -103,7 +103,7 @@ for line in cmd_lines('git', 'branch', '--all'):
     if line[0] == '*':
         continue
 
-    if not re.match(r'[a-zA-Z0-9-]+(\/[a-zA-Z0-9-]+)*$', line):
+    if not re.match(r'[a-zA-Z0-9-\._]+(\/[a-zA-Z0-9-\._]+)*$', line):
         continue
 
     branch = parse_branch(line)
