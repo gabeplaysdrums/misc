@@ -25,6 +25,12 @@ def parse_command_line():
         action='store_true',
     )
 
+    parser.add_option(
+        '-r', '--remote-filter', dest='remote_filters', default=[], metavar='PATTERN',
+        help='show only remote branches that match the given pattern',
+        action='append',
+    )
+
     return parser.parse_args()
 
 (options, args) = parse_command_line()
@@ -135,7 +141,7 @@ def write_branches(f, branches, filt):
             return 1
         return int((x - y).total_seconds())
 
-    for branch in sorted(filter(lambda x: filt, branches), key=lambda x: x.last_updated_date, cmp=compare_dates):
+    for branch in sorted(filter(filt, branches), key=lambda x: x.last_updated_date, cmp=compare_dates):
         f.write('# %-30s # %s\n' % (branch.fqn, branch.last_updated_date.strftime(DATE_FORMAT) if branch.last_updated_date is not None else '(unknown)'))
 
 f.writelines([
@@ -144,7 +150,7 @@ f.writelines([
     '# ==============\n',
 ])
 
-write_branches(f, branches, lambda x: x.remote is None)
+write_branches(f, branches, lambda x: not x.remote)
 
 f.writelines([
     '\n',
@@ -152,7 +158,12 @@ f.writelines([
     '# ===============\n',
 ])
 
-write_branches(f, branches, lambda x: x.remote is not None)
+def remote_filter(branch):
+    if options.remote_filters:
+        return branch.remote and any(fnmatch.fnmatch(branch.name, pattern) for pattern in options.remote_filters)
+    return branch.remote
+
+write_branches(f, branches, remote_filter)
 
 f.write('\n')
 f.close()
