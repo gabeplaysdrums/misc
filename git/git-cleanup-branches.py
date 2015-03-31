@@ -125,14 +125,26 @@ f.writelines([
     '# !! Remote branches will be permanently deleted from the remote !!\n',
 ])
 
+def write_branches(f, branches, filt):
+    def compare_dates(x, y):
+        if x is None and y is None:
+            return 0
+        if x is None:
+            return -1
+        if y is None:
+            return 1
+        return int((x - y).total_seconds())
+
+    for branch in sorted(filter(lambda x: filt, branches), key=lambda x: x.last_updated_date, cmp=compare_dates):
+        f.write('# %-30s # %s\n' % (branch.fqn, branch.last_updated_date.strftime(DATE_FORMAT) if branch.last_updated_date is not None else '(unknown)'))
+
 f.writelines([
     '\n',
     '# Local Branches\n',
     '# ==============\n',
 ])
 
-for branch in sorted(filter(lambda x: x.remote is None, branches), key=lambda x: x.last_updated_date):
-    f.write('# %-30s # %s\n' % (branch.fqn, branch.last_updated_date.strftime(DATE_FORMAT)))
+write_branches(f, branches, lambda x: x.remote is None)
 
 f.writelines([
     '\n',
@@ -140,17 +152,7 @@ f.writelines([
     '# ===============\n',
 ])
 
-def compare_dates(x, y):
-    if x is None and y is None:
-        return 0
-    if x is None:
-        return -1
-    if y is None:
-        return 1
-    return int((x - y).total_seconds())
-
-for branch in sorted(filter(lambda x: x.remote is not None, branches), key=lambda x: x.last_updated_date, cmp=compare_dates):
-    f.write('# %-30s # %s\n' % (branch.fqn, branch.last_updated_date.strftime(DATE_FORMAT) if branch.last_updated_date is not None else '(unknown)'))
+write_branches(f, branches, lambda x: x.remote is not None)
 
 f.write('\n')
 f.close()
