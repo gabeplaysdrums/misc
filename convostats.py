@@ -28,6 +28,7 @@ import fnmatch
 import re
 from datetime import date, time, datetime
 from wordcloud import WordCloud, STOPWORDS
+import json
 
 
 def parse_command_line():
@@ -100,6 +101,7 @@ def process_html(path):
 
     with open(path, 'r') as f:
         soup = BeautifulSoup(f, 'html.parser')
+        soup.prettify()
         curr_date = gaim_extract_date(soup)
         if curr_date and soup.find(sml='AIM/ICQ'):
             print('gaim log detected')
@@ -120,6 +122,24 @@ def process_html(path):
                     if curr_time and curr_alias:
                         timestamp = datetime.combine(curr_date, curr_time)
                         alias = curr_alias
+        elif soup.head and soup.head.noscript and 'facebook.com' in soup.head.noscript.get_text():
+            print('facebook log detected')
+            for tag in soup.body.find_all(class_='msg'):
+                alias = tag.find(class_='actor').get_text()
+                message_tag = tag.find(attrs={'data-sigil': 'message-text'})
+
+                # remove links
+                for link_tag in message_tag.find_all('a'):
+                    link_tag.extract()
+
+                # remove attachments
+                for attach_tag in message_tag.find_all(class_='messageAttachments'):
+                    attach_tag.extract()
+
+                message = message_tag.get_text()
+                timestamp_as_millis = json.loads(message_tag.get('data-store'))['timestamp']
+                timestamp = datetime.fromtimestamp(timestamp_as_millis / 1000.0)
+                yield alias, message, timestamp
 
 
 SUBSTITUTES = (
@@ -156,6 +176,12 @@ SUBSTITUTES = (
     ('esp', 'especially'),
     ('tho', 'though'),
     ('convo', 'conversation'),
+    ('ko', 'ok'),
+    ('kk', 'ok'),
+    (r'aw[w]*', 'aww'),
+    (r'yo[o]*', 'yo'),
+    ('ap', 'app'),
+    ('discovercard', 'discover card'),
 )
 
 
@@ -170,12 +196,14 @@ def main(options, args):
 
     if os.path.isdir(input_path):
         for (root, dirs, files) in os.walk(input_path):
-            for name in fnmatch.filter(files, '*.html'):
+            html_files = list(fnmatch.filter(files, '*.html')) + list(fnmatch.filter(files, '*.htm'))
+            for name in html_files:
                 path = os.path.join(root, name)
                 print('Processing %s ...' % (path,))
                 for alias, message, timestamp in process_html(path):
                     message_count += 1
                     message_text += message + '\n'
+                    print('alias=', alias, 'message=', message, 'timestamp=', timestamp)
 
         print('Processed %d messages' % message_count)
 
@@ -213,7 +241,7 @@ def main(options, args):
         'hey',
         'hello',
         'hi',
-        'kk',
+        'yo',
         'anyway',
         'stuff',
         'also',
