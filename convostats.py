@@ -130,11 +130,11 @@ def process_html(path):
 
                 # remove links
                 for link_tag in message_tag.find_all('a'):
-                    link_tag.extract()
+                    link_tag.decompose()
 
                 # remove attachments
                 for attach_tag in message_tag.find_all(class_='messageAttachments'):
-                    attach_tag.extract()
+                    attach_tag.decompose()
 
                 message = message_tag.get_text()
                 timestamp_as_millis = json.loads(message_tag.get('data-store'))['timestamp']
@@ -195,7 +195,7 @@ def main(options, args):
     message_text = ''
 
     if os.path.isdir(input_path):
-        for (root, dirs, files) in os.walk(input_path):
+        for (root, dirs, files) in os.walk(os.path.abspath(input_path)):
             html_files = list(fnmatch.filter(files, '*.html')) + list(fnmatch.filter(files, '*.htm'))
             for name in html_files:
                 path = os.path.join(root, name)
@@ -203,12 +203,12 @@ def main(options, args):
                 for alias, message, timestamp in process_html(path):
                     message_count += 1
                     message_text += message + '\n'
-                    print('alias=', alias, 'message=', message, 'timestamp=', timestamp)
+                    #print('alias=', alias, 'message=', message, 'timestamp=', timestamp)
 
         print('Processed %d messages' % message_count)
 
         if options.message_text_output_path:
-            with open(options.message_text_output_path, 'w') as f:
+            with open(os.path.abspath(options.message_text_output_path), 'w') as f:
                 f.write(message_text.encode('utf8'))
     else:
         with open(input_path, 'r') as f:
