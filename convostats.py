@@ -9,6 +9,14 @@ Beautiful Soup
 https://www.crummy.com/software/BeautifulSoup/
 pip install beautifulsoup4
 
+amueller's word_cloud
+https://github.com/amueller/word_cloud
+pip install wordcloud
+
+Pillow - The friendly PIL fork
+https://python-pillow.org/
+pip install pillow
+
 """
 
 from __future__ import print_function
@@ -19,6 +27,7 @@ from bs4 import BeautifulSoup
 import fnmatch
 import re
 from datetime import date, time, datetime
+from wordcloud import WordCloud, STOPWORDS
 
 
 def parse_command_line():
@@ -29,13 +38,16 @@ def parse_command_line():
     
     # options
 
-    """
     parser.add_option(
-        '-o', '--output', dest='output_path', default='output.txt',
-        help='output path',
+        '--message-text-output', dest='message_text_output_path', default=None,
+        help='write message text to a file',
     )
-    """
-    
+
+    parser.add_option(
+        '-o', '--output', dest='output_path', default=None,
+        help='write word cloud to image file',
+    )
+
     (options, args) = parser.parse_args()
 
     # args
@@ -110,18 +122,135 @@ def process_html(path):
                         alias = curr_alias
 
 
+SUBSTITUTES = (
+    ('gues', 'guess'),
+    ('ye', 'yes'),
+    ('hah', 'ha'),
+    ('heh', 'ha'),
+    ('haha', 'ha'),
+    ('ily', 'i love you'),
+    ('iloveyou', 'i love you'),
+    ('gn', 'good night'),
+    ('goodnight', 'good night'),
+    ('sd', 'sweet dreams'),
+    ('sweetdreams', 'sweet dreams'),
+    ('gnsdily', 'good night sweet dreams i love you'),
+    ('goodnightsweetdreamsiloveyou', 'good night sweet dreams i love you'),
+    ('prolly', 'probably'),
+    ('Devils Halo 1001', 'devilshalo1001'),
+    ('alway', 'always'),
+    ('wanna', 'want to'),
+    ('gonna', 'going to'),
+    ('ppl', 'people'),
+    ('brb', 'be right back'),
+    ('hw', 'homework'),
+    ('nite', 'night'),
+    ('im', 'i am'),
+    ("it'll", 'it will'),
+    ('dont', "don't"),
+    ("dont'", "don't"),
+    ('cuz', 'because'),
+    ('np', 'no problem'),
+    ('lemme', 'let me'),
+    ('btw', 'by the way'),
+    ('esp', 'especially'),
+    ('tho', 'though'),
+    ('convo', 'conversation'),
+)
+
+
+wordcloud = None
+
+
 def main(options, args):
-    input_root = args[0]
+    global wordcloud
+    input_path = args[0]
     message_count = 0
+    message_text = ''
 
-    for (root, dirs, files) in os.walk(input_root):
-        for name in fnmatch.filter(files, '*.html'):
-            path = os.path.join(root, name)
-            print('Processing %s ...' % (path,))
-            for alias, message, timestamp in process_html(path):
-                message_count += 1
+    if os.path.isdir(input_path):
+        for (root, dirs, files) in os.walk(input_path):
+            for name in fnmatch.filter(files, '*.html'):
+                path = os.path.join(root, name)
+                print('Processing %s ...' % (path,))
+                for alias, message, timestamp in process_html(path):
+                    message_count += 1
+                    message_text += message + '\n'
 
-    print('Processed %d messages' % message_count)
+        print('Processed %d messages' % message_count)
+
+        if options.message_text_output_path:
+            with open(options.message_text_output_path, 'w') as f:
+                f.write(message_text.encode('utf8'))
+    else:
+        with open(input_path, 'r') as f:
+            message_text = f.read().decode('utf8')
+
+    for a, b in SUBSTITUTES:
+        message_text = re.sub(r'\b' + a + r'\b', b, message_text, flags=re.IGNORECASE | re.MULTILINE)
+
+    stopwords = {
+        'yeah',
+        'yup',
+        'yups',
+        'yep',
+        'yeps',
+        'nope',
+        'nah',
+        'mm',
+        'well',
+        'think',
+        'thing',
+        'something',
+        'anything',
+        'thing',
+        'things',
+        'oh',
+        'ah',
+        'ahh',
+        'alright',
+        'hmm',
+        'hey',
+        'hello',
+        'hi',
+        'kk',
+        'anyway',
+        'stuff',
+        'also',
+        'anyways',
+        'kinda',
+        'ok',
+        'okay',
+        'um',
+        'umm',
+        'newsboytko',
+        'devilshalo1001',
+        'pff',
+        'psh',
+        'eh',
+        'meh',
+        'PM',
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+    }
+
+    stopwords.update(STOPWORDS)
+
+    wordcloud = WordCloud(width=1280, height=720, max_words=1000, stopwords=stopwords).generate(message_text)
+
+    for word, weight in sorted(wordcloud.words_, key=lambda x: x[1], reverse=True):
+        print('%-30s %.6f' % (word, weight))
+
+    image = wordcloud.to_image()
+    image.show()
+
+    if options.output_path:
+        image.save(options.output_path)
 
 if __name__ == '__main__':
     main(*parse_command_line())
