@@ -99,11 +99,51 @@ def process_html(path):
                     return alias
         return None
 
+    def purple_extract_date(soup):
+        if soup.title:
+            m = re.match(r'Conversation with .* at (\d\d?)/(\d\d?)/(\d{4}) \d\d?:\d{2}:\d{2} (AM|PM) on .* \(aim\)', soup.title.get_text())
+            if m:
+                year = int(m.group(3))
+                month = int(m.group(1))
+                day = int(m.group(2))
+                return date(year, month, day)
+        return None
+
+    def purple_extract_time(tag):
+        if tag.font:
+            m = re.match(r'\((\d\d?):(\d{2}):(\d{2})\s+(AM|PM)\)', tag.font.get_text())
+            if m:
+                hours = int(m.group(1))
+                minutes = int(m.group(2))
+                seconds = int(m.group(3))
+                if m.group(4) == 'PM':
+                    hours += 12
+
+                #TODO: bug! message occurred the next day
+                if hours > 23:
+                    hours -= 24
+
+                return time(hours, minutes, seconds)
+        return None
+
+    def purple_extract_message(tag):
+        message = ''
+        for sibling in tag.next_siblings:
+            if sibling.name == 'font':
+                break
+            elif not sibling.name:
+                message += unicode(sibling).strip() + '\n'
+        return message.strip()
+
+    def purple_extract_alias(tag):
+        return gaim_extract_alias(tag)
+
     with open(path, 'r') as f:
         soup = BeautifulSoup(f, 'html.parser')
         soup.prettify()
-        curr_date = gaim_extract_date(soup)
-        if curr_date and soup.find(sml='AIM/ICQ'):
+        gaim_date = gaim_extract_date(soup)
+        purple_date = purple_extract_date(soup)
+        if gaim_date and soup.find(sml='AIM/ICQ'):
             print('gaim log detected')
 
             timestamp = None
@@ -120,8 +160,23 @@ def process_html(path):
                     curr_time = gaim_extract_time(tag)
                     curr_alias = gaim_extract_alias(tag)
                     if curr_time and curr_alias:
-                        timestamp = datetime.combine(curr_date, curr_time)
+                        timestamp = datetime.combine(gaim_date, curr_time)
                         alias = curr_alias
+        elif purple_date:
+            print('purple log detected')
+
+            for tag in soup.body.find_all('font', recursive=False):
+                # TODO: remove
+                # current_tag = tag
+
+                curr_time = purple_extract_time(tag)
+                curr_alias = purple_extract_alias(tag)
+                if curr_time and curr_alias:
+                    timestamp = datetime.combine(purple_date, curr_time)
+                    alias = curr_alias
+                    message = purple_extract_message(tag)
+                    yield alias, message, timestamp
+
         elif soup.head and soup.head.noscript and 'facebook.com' in soup.head.noscript.get_text():
             print('facebook log detected')
             for tag in soup.body.find_all(class_='msg'):
@@ -136,10 +191,12 @@ def process_html(path):
                 for attach_tag in message_tag.find_all(class_='messageAttachments'):
                     attach_tag.decompose()
 
-                message = message_tag.get_text()
+                message = message_tag.get_text().strip()
                 timestamp_as_millis = json.loads(message_tag.get('data-store'))['timestamp']
                 timestamp = datetime.fromtimestamp(timestamp_as_millis / 1000.0)
                 yield alias, message, timestamp
+        else:
+            print('unrecognized log format')
 
 
 SUBSTITUTES = (
@@ -182,14 +239,12 @@ SUBSTITUTES = (
     (r'yo[o]*', 'yo'),
     ('ap', 'app'),
     ('discovercard', 'discover card'),
+    ('ttyl', 'talk to you later'),
+    ('watcha', 'what are you'),
 )
 
 
-wordcloud = None
-
-
 def main(options, args):
-    global wordcloud
     input_path = args[0]
     message_count = 0
     message_text = ''
@@ -208,11 +263,13 @@ def main(options, args):
         print('Processed %d messages' % message_count)
 
         if options.message_text_output_path:
-            with open(os.path.abspath(options.message_text_output_path), 'w') as f:
+            with open(os.path.normpath(options.message_text_output_path), 'w') as f:
                 f.write(message_text.encode('utf8'))
     else:
         with open(input_path, 'r') as f:
             message_text = f.read().decode('utf8')
+
+    message_text = re.sub('\d*', '', message_text)
 
     for a, b in SUBSTITUTES:
         message_text = re.sub(r'\b' + a + r'\b', b, message_text, flags=re.IGNORECASE | re.MULTILINE)
