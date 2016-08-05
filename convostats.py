@@ -29,6 +29,7 @@ import re
 from datetime import date, time, datetime
 from wordcloud import WordCloud, STOPWORDS
 import json
+import xml.etree.cElementTree as ET
 
 
 def parse_command_line():
@@ -228,9 +229,37 @@ def process_txt(path):
                 curr_message_part = line
         return curr_time, curr_alias, curr_message_part
 
+    def wp_extract(line):
+        alias = None
+        timestamp = None
+        message_part = None
+        if line:
+            m = re.match(r'^([a-zA-Z0-9 ]+)\s+(\d\d?)/(\d\d?)/(\d{4}) (\d\d?):(\d{2}):(\d{2}) (AM|PM):', line)
+            if m:
+                alias = m.group(1)
+                month = int(m.group(2))
+                day = int(m.group(3))
+                year = int(m.group(4))
+                hours = int(m.group(5))
+                minutes = int(m.group(6))
+                seconds = int(m.group(7))
+                if m.group(8) == 'PM':
+                    hours += 12
+
+                if hours > 23:
+                    hours -= 24
+
+                timestamp = datetime(year, month, day, hours, minutes, seconds)
+            elif re.match(r'< This attachment is stored at .* >', line):
+                pass
+            else:
+                message_part = line
+        return alias, timestamp, message_part
+
     with open(path) as fin:
         first_line = fin.readline()
         purple_date = purple_extract_date(first_line)
+        wp_alias, wp_timestamp, wp_message_part = wp_extract(first_line)
         if purple_date:
             print('purple log detected')
 
@@ -251,9 +280,42 @@ def process_txt(path):
 
             if timestamp and alias and message:
                 yield alias, message.strip(), timestamp
+        elif wp_alias and wp_timestamp and wp_message_part is None:
+            print('Windows Phone SMS Backup log detected')
+
+            alias = wp_alias
+            timestamp = wp_timestamp
+            message = ''
+
+            for line in fin:
+                curr_alias, curr_timestamp, curr_message_part = wp_extract(line)
+                if curr_alias and curr_timestamp:
+                    if timestamp and alias and message:
+                        yield alias, message.strip(), timestamp
+                    alias = curr_alias
+                    timestamp = curr_timestamp
+                    message = ''
+                elif curr_message_part:
+                    message += curr_message_part
         else:
             print('unrecognized log format')
 
+
+def process_xml(path):
+    head = None
+    with open(path, 'r') as f:
+        head = f.read(200)
+    if 'File Created By SMS Backup & Restore' in head:
+        print('SMS Backup and Restore (Android) log detected')
+        for event, elem in ET.iterparse(path, events=('end',)):
+            if elem.tag == 'sms':
+                timestamp = datetime.fromtimestamp(int(elem.attrib['date']) / 1000.0)
+                message = elem.attrib['body']
+                alias = elem.attrib['contact_name']
+                elem.clear()
+                yield alias, message, timestamp
+    else:
+        print('unrecognized log format')
 
 SUBSTITUTES = (
     ('gues', 'guess'),
@@ -300,6 +362,8 @@ SUBSTITUTES = (
     ('ttyl', 'talk to you later'),
     ('watcha', 'what are you'),
     (r'oo[o]*[h]?', 'ooh'),
+    ('dunno', "i don't know"),
+    ('th', 'the'),
 )
 
 
@@ -319,7 +383,7 @@ def main(options, args):
                 path = os.path.join(root, name)
                 print('Processing %s ...' % (path,))
                 for alias, message, timestamp in fn(path):
-                    #print('alias=', alias, 'message=', repr(message), 'timestamp=', timestamp)
+                    print('alias=', alias, 'message=', repr(message), 'timestamp=', timestamp)
                     try:
                         message = message.encode('ascii', 'ignore')
                         ctx.message_count += 1
@@ -332,6 +396,8 @@ def main(options, args):
             process_files(root, html_files, process_html)
             txt_files = fnmatch.filter(files, '*.txt')
             process_files(root, txt_files, process_txt)
+            xml_files = fnmatch.filter(files, '*.xml')
+            process_files(root, xml_files, process_xml)
 
         print('Processed %d messages' % ctx.message_count)
 
