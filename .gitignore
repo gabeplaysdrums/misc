@@ -7,3 +7,4 @@
 pyflickr-in/
 pyflickr-out/
 .idea/
+*.cfg
