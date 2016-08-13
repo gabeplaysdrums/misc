@@ -51,6 +51,11 @@ def main(options, args):
     config.read(['maildump.cfg'])
     pp = PrettyPrinter(indent=4)
 
+    def get_config_option(section, option, default):
+        if config.has_option(section, option):
+            return config.get(section, option)
+        return default
+
     for section in filter(lambda x: x.startswith('Server:'), config.sections()):
         server_name = section.split('Server:')[1]
         print('[%s]' % (server_name,))
@@ -93,9 +98,24 @@ def main(options, args):
                 print('Selecting mailbox', mailbox)
                 rv, data = mail.select(mailbox, readonly=True)
                 assert rv == 'OK'
+                your_addresses = re.split(r'\s*,\s*', config.get('Search', 'your_addresses').strip())
+                their_addresses = re.split(r'\s*,\s*', config.get('Search', 'their_addresses').strip())
+
+                for their_address in their_addresses:
+                    print('Searching for messages from', their_address)
+                    rv, data = mail.search(None, '(FROM %s)' % (their_address,))
+                    assert rv == 'OK'
+                    results = data[0].split()
+                    print('Found', len(results), 'results')
+                    print('Searching for messages to', their_address)
+                    rv, data = mail.search(None, '(TO %s)' % (their_address,))
+                    assert rv == 'OK'
+                    results = data[0].split()
+                    print('Found', len(results), 'results')
 
         except Exception:
             print(traceback.format_exc())
+
 
 if __name__ == '__main__':
     main(*parse_command_line())
