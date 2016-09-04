@@ -30,6 +30,8 @@ from datetime import date, time, datetime
 from wordcloud import WordCloud, STOPWORDS
 import json
 import xml.etree.cElementTree as ET
+import numpy as np
+from PIL import Image
 
 
 def parse_command_line():
@@ -48,6 +50,21 @@ def parse_command_line():
     parser.add_option(
         '-o', '--output', dest='output_path', default=None,
         help='write word cloud to image file',
+    )
+
+    parser.add_option(
+        '-m', '--mask', dest='mask_path', default=None,
+        help='path to mask image',
+    )
+
+    parser.add_option(
+        '--width', dest='width', type='int', default=1280,
+        help='image width',
+    )
+
+    parser.add_option(
+        '--height', dest='height', type='int', default=720,
+        help='image height',
     )
 
     (options, args) = parser.parse_args()
@@ -465,7 +482,19 @@ def main(options, args):
 
     stopwords.update(STOPWORDS)
 
-    wordcloud = WordCloud(width=1280, height=720, max_words=1000, stopwords=stopwords).generate(ctx.message_text)
+    mask = None
+
+    if options.mask_path:
+        mask = np.array(Image.open(options.mask_path))
+
+    wordcloud = WordCloud(
+        background_color='white',
+        width=options.width,
+        height=options.height,
+        max_words=1000,
+        stopwords=stopwords,
+        mask=mask
+    ).generate(ctx.message_text)
 
     for word, weight in sorted(wordcloud.words_, key=lambda x: x[1], reverse=True):
         print('%-30s %.6f' % (word, weight))
