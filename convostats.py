@@ -493,7 +493,8 @@ def main(options, args):
         height=options.height,
         max_words=1000,
         stopwords=stopwords,
-        mask=mask
+        mask=mask,
+        prefer_horizontal=0.99,
     ).generate(ctx.message_text)
 
     for word, weight in sorted(wordcloud.words_, key=lambda x: x[1], reverse=True):
